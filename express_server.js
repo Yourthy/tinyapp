@@ -1,6 +1,16 @@
 const express = require("express");
 const app = express();
 const PORT = 8080;
+const bodyParser = require("body-parser");
+const { response } = require("express");
+app.use(bodyParser.urlencoded({extended: true}));
+
+
+function generateRandomString() {
+    let r = Math.random().toString(36).substring(7);
+    return "random", r;
+};
+
 
 app.set("view engine", "ejs");
 
@@ -9,6 +19,32 @@ const urlDatabase = {
   "9sm5xK": "http://www.google.com"
 };
 
+app.get("/urls/new", (request, response) =>{
+    response.render("urls_new");
+});
+
+app.post("/urls", (req, res) => {
+    console.log(req.body); 
+    let shortURL = generateRandomString();
+    urlDatabase[shortURL] = req.body.longURL;
+    res.redirect('/urls/' + shortURL);         
+  });
+
+  
+
+  app.get("/urls/:shortURL", (req, res) => {
+    const shortURL = req.params.shortURL;
+    const longURL = urlDatabase[shortURL];
+    const templateVars = { shortURL, longURL };
+    res.render("urls_show", templateVars);
+  });
+  
+  app.post("/urls/:shortURL/delete", (req, res) => {
+    delete shortURL;
+    console.log(urlDatabase);
+    res.redirect("/urls")
+  });
+  
 
 
 app.get('/urls', (request, response)=>{
@@ -16,10 +52,16 @@ app.get('/urls', (request, response)=>{
     response.render("urls_index", templateVars);
 });
 
+app.get("/u/:shortURL", (req, res) => {
+    const longURL = urlDatabase[req.params.shortURL];
+    res.redirect(longURL);
+  });
+
 app.get("/urls/:shortURL", (request, response) => {
     const templateVars = { shortURL: request.params.shortURL, longURL: request.params.longUrl };
     response.render("urls_show", templateVars);
   });
+
 
 app.listen(PORT, ()=>{
     console.log(`Now listening on port:${PORT}`);
