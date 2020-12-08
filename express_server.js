@@ -16,6 +16,11 @@ app.get('/urls', (request, response)=>{
     response.render("urls_index", templateVars);
 });
 
+app.get("/urls/:shortURL", (request, response) => {
+    const templateVars = { shortURL: request.params.shortURL, longURL: request.params.longUrl };
+    response.render("urls_show", templateVars);
+  });
+
 app.listen(PORT, ()=>{
     console.log(`Now listening on port:${PORT}`);
 });
