@@ -1,117 +1,99 @@
 const express = require("express");
+const cookieParser = require("cookie-parser");
+
 const app = express();
 const PORT = 8080;
 const bodyParser = require("body-parser");
 const { response } = require("express");
+
+app.set("view engine", "ejs");
+//middleware
+app.use(cookieParser());
 app.use(bodyParser.urlencoded({extended: true}));
 
 
+//function to generate random string for a short URL
 function generateRandomString() {
     let r = Math.random().toString(36).substring(7);
     return "random", r;
 };
 
 
-app.set("view engine", "ejs");
-
+//use to keep track of all URLs and their shortened form
 const urlDatabase = {
-    "b2xVn2": "http://www.lighthouselabs.ca",
+  "b2xVn2": "http://www.lighthouselabs.ca",
   "9sm5xK": "http://www.google.com"
 };
 
-app.get("/urls/new", (request, response) =>{
-    response.render("urls_new");
+//generates a random string for short URL
+app.post("/urls", (request, response) => {
+  console.log(request.body); 
+  let shortURL = generateRandomString();
+  urlDatabase[shortURL] = request.body.longURL;
+  response.redirect('/urls/' + shortURL);         
 });
 
-app.post("/urls", (req, res) => {
-    console.log(req.body); 
-    let shortURL = generateRandomString();
-    urlDatabase[shortURL] = req.body.longURL;
-    res.redirect('/urls/' + shortURL);         
-  });
+app.post("/login", (req, res) => {
+  let username = req.body.username;
+  res.cookie("username", username);
+  res.redirect("/urls");
+});
 
-  
+  //displays all the URL and their shortened forms
+  app.get('/urls', (request, response)=>{
+    const templateVars = {
+      urls: urlDatabase,
+      username: request.cookies['username']
+    };
 
-  app.get("/urls/:shortURL", (req, res) => {
-    const shortURL = req.params.shortURL;
-    const longURL = urlDatabase[shortURL];
-    const templateVars = { shortURL, longURL };
-    res.render("urls_show", templateVars);
-  });
-  
-  app.post("/urls/:shortURL/delete", (req, res) => {
-    delete shortURL;
-    console.log(urlDatabase);
-    res.redirect("/urls")
-  });
-  
-
-
-app.get('/urls', (request, response)=>{
-    const templateVars = {urls: urlDatabase};
+    // console.log(request.cookies["username"]);
     response.render("urls_index", templateVars);
+  });
+
+  app.post("/logout", (request, response)=>{
+    response.clearCookie("username");
+    response.redirect('/urls');
+  });
+
+//route to render urls_new
+app.get("/urls/new", (request, response) =>{
+    const templateVars = {
+      username: request.cookies['username']
+    };
+    response.render("urls_new", templateVars);
 });
 
-app.get("/u/:shortURL", (req, res) => {
-    const longURL = urlDatabase[req.params.shortURL];
-    res.redirect(longURL);
-  });
+app.get("/u/:shortURL", (request, response) => {
+  const shortURL = request.params.shortURL;
+  const longURL = urlDatabase[shortURL];
+  response.redirect(longURL);
+});
 
 app.get("/urls/:shortURL", (request, response) => {
-    const templateVars = { shortURL: request.params.shortURL, longURL: request.params.longUrl };
-    response.render("urls_show", templateVars);
-  });
-
-
-app.listen(PORT, ()=>{
-    console.log(`Now listening on port:${PORT}`);
+  const shortURL = request.params.shortURL;
+  const longURL = urlDatabase[shortURL];
+  const templateVars = { shortURL, longURL, username: request.cookies['username'] };
+  response.render("urls_show", templateVars);
 });
 
-// app.get('/', (request, response)=>{
-//     response.render('pages/index');
-// });
-
-//about page
-// app.get('/about', (request, response)=>{
-    //     response.render('pages/about');
-// });
-
-
-
-
-
-// app.get('/', (request, response)=>{
-//     response.send("hello there!");
-// });
-
-// app.get('/hello', (request, response)=>{
-//     response.send("<html><body>Hello <b>World!</b></body></html>\n");
-// });
-
-// app.get('/set', (request, response)=>{
-//     const a = 1;
-//     response.send(`a = ${a}`);
-// });
-
-// app.get('/fetch', (request, response)=>{
-//     response.send(`a = ${a}`);
-// });
-
-
-// app.get('/', (request, response)=>{
-//     let mascots = [
-//         { name: 'Sammy', organization: "DigitalOcean", birth_year: 2012},
-//         { name: 'Tux', organization: "Linux", birth_year: 1996},
-//         { name: 'Moby Dock', organization: "Docker", birth_year: 2013}
-//     ];
-//     let tagline = 'No programming concept is complete without a cute animal mascot.';
-
-//     response.render('pages/index', {
-//         mascots: mascots,
-//         tagline: tagline
-//     });
-// });
-
-
-
-
+//displays a single URL and its shortned form
+  app.get("/urls/:shortURL", (request, response) => {
+    const shortURL = request.params.shortURL;
+    const longURL = urlDatabase[shortURL];
+    const templateVars = { shortURL, longURL, username: request.cookies['username']};
+    response.render("urls_show", templateVars);
+  });
+  
+  
+  app.post("/urls/:shortURL/delete", (request, response) => {
+    let shortURL = request.params.shortURL;
+    delete urlDatabase[shortURL];
+    response.redirect("/urls");
+  });
+  
+  //prints to console confirming server is up
+  app.listen(PORT, ()=>{
+    console.log(`Now listening on port:${PORT}`);
+  });
+  
+  
