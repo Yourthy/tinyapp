@@ -1,9 +1,12 @@
 //////////////////////////////////////////////////////////////
 //                      SETUP                               //
 //////////////////////////////////////////////////////////////
-const cookieSession = require("cookie-session")
+
 const express = require("express");
 const cookieParser = require("cookie-parser");
+const bcrypt = require('bcrypt');
+// const password = "purple-monkey-dinosaur"; // found in the req.params object
+// const hashedPassword = bcrypt.hashSync(password, 10);
 
 const app = express();
 const PORT = 8080;
@@ -54,8 +57,8 @@ const getUserNameByUserId = (userID)=>{
 
 //use to keep track of all URLs and their shortened form
 const urlDatabase = {
-  b2xVn2: "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com",
+  "b2xVn2": {longURL: "http://www.lighthouselabs.ca",  userID: "aJ48lW"},
+  "9sm5xK": {longURL: "http://www.google.com", userID: "aJ48lW"}
 };
 
 const users = {
@@ -71,9 +74,10 @@ const users = {
 //////////////////////////////////////////////////////////////
 //generates a random string for short URL
 app.post("/urls", (req, res) => {
-  console.log(req.body);
   let shortURL = generateRandomString();
-  urlDatabase[shortURL] = req.body.longURL;
+  urlDatabase[shortURL] = {};
+  urlDatabase[shortURL].longURL = req.body.longURL;
+  urlDatabase[shortURL].userID = req.cookies["user_id"];
   res.redirect("/urls/" + shortURL);
 });
 
@@ -96,9 +100,15 @@ app.post("/logout", (req, res) => {
 });
 
 app.post("/urls/:shortURL/delete", (req, res) => {
-  let shortURL = req.params.shortURL
-  delete urlDatabase[shortURL];
-  res.redirect("/urls");
+  const shortURL = req.params.shortURL;
+  if(urlDatabase[shortURL].userID === req.cookies["user_id"]){
+    delete urlDatabase[shortURL];
+    res.redirect("/urls");
+
+  }else{
+    res.redirect("/urls");
+  }
+  
 });
 
 app.post("/register", (req, res)=>{
@@ -106,7 +116,6 @@ app.post("/register", (req, res)=>{
   let password = req.body.password;
   // const hashedPassword = bcrypt.hashSync(password, 10);
   console.log(email);
-  
   
   // console.log(hashedPassword);
   if(email === "" || password === ""){
@@ -117,7 +126,7 @@ app.post("/register", (req, res)=>{
     return res.status(400).send("that account already exists, please try again");
 
   }else{
-    
+
     const user = {
       id: generateRandomString(),
       email,
@@ -136,19 +145,29 @@ app.post("/register", (req, res)=>{
 //////////////////////////////////////////////////////////////
 //displays all the URL and their shortened forms
 app.get("/urls", (req, res) => {
-  
-  if(req.cookies["user_id"] === undefined){
-    res.redirect("register");
+  const user = req.cookies['user_id'];
+  let userDB = {};
+  if(!user){
+    res.send("You have not logged in yet! <a href='/login'>Login Here </a>")
   }else{
-   
-  const templateVars = {
-    urls: urlDatabase,
-    email: getUserNameByUserId([req.cookies["user_id"]]),
-  };
-    res.render("urls_index", templateVars);
 
-  }
-  // console.log(req.cookies["username"]);
+    for(let obj in urlDatabase){
+      // console.log(urlDatabase[obj].userID);
+      if(user === urlDatabase[obj].userID){
+        userDB[obj] = urlDatabase[obj];
+    
+      }
+      console.log(userDB);
+    }
+    
+    const templateVars = {
+      urls: userDB,
+      email: getUserNameByUserId([req.cookies["user_id"]]),
+    };
+    
+      res.render("urls_index", templateVars);
+  
+    }
 });
 
 app.get("/login", (req, res) => {
@@ -174,25 +193,31 @@ app.get("/urls/new", (req, res) => {
   const templateVars = {
     email: getUserNameByUserId([req.cookies["user_id"]]),
   };
-  res.render("urls_new", templateVars);
+  if(getUserByEmail(templateVars.email)){
+    res.render("urls_new", templateVars);
+  }else{
+    res.redirect("/login");
+  }
 });
 
 app.get("/u/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
-  const longURL = urlDatabase[shortURL];
+  const longURL = urlDatabase[shortURL].longURL;
   res.redirect(longURL);
 });
 
 app.get("/urls/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
-  const longURL = urlDatabase[shortURL];
+  const longURL = urlDatabase[shortURL].longURL;
   const templateVars = {
-    shortURL,
-    longURL,
+    shortURL: shortURL,
+    longURL: longURL,
     email: getUserNameByUserId([req.cookies["user_id"]]),
   };
   res.render("urls_show", templateVars);
 });
+
+
 
 //displays a single URL and its shortned form
 app.get("/urls/:shortURL", (req, res) => {
