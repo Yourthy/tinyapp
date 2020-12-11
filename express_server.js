@@ -1,11 +1,11 @@
 //////////////////////////////////////////////////////////////
 //                      SETUP                               //
 //////////////////////////////////////////////////////////////
-
+const cookieSession = require("cookie-session")
 const express = require("express");
 const app = express();
 const cookieParser = require("cookie-parser");
-const bcrypt = require('bcrypt');
+// const bcrypt = require('bcrypt');
 // const password = "purple-monkey-dinosaur"; // found in the req.params object
 // const hashedPassword = bcrypt.hashSync(password, 10);
 
@@ -93,7 +93,7 @@ app.post("/login", (req, res) => {
   let password = req.body.password;
   const user = getUserByEmail(email);
   if(user){
-    res.cookie("user_id", user.id);
+    res.cookies("user_id", user.id);
     return res.redirect("/urls");
   }
   return res.status(403).send("no user with that email found");
@@ -101,7 +101,7 @@ app.post("/login", (req, res) => {
 });
 
 app.post("/logout", (req, res) => {
-  res.clearCookie("user_id");
+  res.clearCookies("user_id");
   // res.clearCookie("username");
   res.redirect("/login");
 });
@@ -120,8 +120,9 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 app.post("/register", (req, res)=>{
   let email = req.body.email;
   let password = req.body.password;
-  const hashedPassword = bcrypt.hashSync(password, 10);
+  // const hashedPassword = bcrypt.hashSync(password, 10);
   console.log(email);
+  
   
   // console.log(hashedPassword);
   if(email === "" || password === ""){
@@ -131,14 +132,14 @@ app.post("/register", (req, res)=>{
   }else if(getUserByEmail(email)){
     return res.status(400).send("that account already exists, please try again");
   }else{
-
+    
     const user = {
       id: generateRandomString(),
       email,
       password
     }
     users[user.id] = user;
-    res.cookie("user_id", user.id);
+    res.cookies("user_id", user.id);
     res.redirect("/urls/")
   
   }
