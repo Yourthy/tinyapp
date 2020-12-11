@@ -3,12 +3,14 @@
 //////////////////////////////////////////////////////////////
 
 const express = require("express");
-const cookieParser = require("cookie-parser");
-
 const app = express();
+const cookieParser = require("cookie-parser");
+const bcrypt = require('bcrypt');
+// const password = "purple-monkey-dinosaur"; // found in the req.params object
+// const hashedPassword = bcrypt.hashSync(password, 10);
+
 const PORT = 8080;
 const bodyParser = require("body-parser");
-const { res } = require("express");
 app.set("view engine", "ejs");
 
 
@@ -44,9 +46,15 @@ const getUserNameByUserId = (userID)=>{
 
 };
 
-
-
-
+// const urlsForUser = (user_id)=>{
+//   let userURL = {};
+//   for(let key in urlDatabase){
+//     if(urlDatabase[key].user_id === user_id){
+//       userURL[key] = urlDatabase[key];
+//     }
+//   }
+//   return userURL;
+// }
 
 //////////////////////////////////////////////////////////////
 //                       DATABASES                          //
@@ -54,9 +62,10 @@ const getUserNameByUserId = (userID)=>{
 
 //use to keep track of all URLs and their shortened form
 const urlDatabase = {
-  b2xVn2: "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com",
+  "b2xVn2": {longURL: "http://www.lighthouselabs.ca",  userID: "aJ48lW"},
+  "9sm5xK": {longURL: "http://www.google.com", userID: "aJ48lW"}
 };
+//
 
 const users = {
   "123ABC": {
@@ -71,9 +80,11 @@ const users = {
 //////////////////////////////////////////////////////////////
 //generates a random string for short URL
 app.post("/urls", (req, res) => {
-  console.log(req.body);
   let shortURL = generateRandomString();
-  urlDatabase[shortURL] = req.body.longURL;
+  urlDatabase[shortURL] = {};
+  urlDatabase[shortURL].longURL = req.body.longURL;
+  urlDatabase[shortURL].id = req.body.id;
+  console.log("urlData POST", urlDatabase);
   res.redirect("/urls/" + shortURL);
 });
 
@@ -96,21 +107,29 @@ app.post("/logout", (req, res) => {
 });
 
 app.post("/urls/:shortURL/delete", (req, res) => {
-  let shortURL = req.params.shortURL
-  delete urlDatabase[shortURL];
-  res.redirect("/urls");
+  const shortURL = req.params.shortURL;
+  // console.log(urlDatabase[shortURL]["userID"]);
+  if(urlDatabase[shortURL].user_id === req.cookies['user_id']){
+   delete urlDatabase[shortURL];
+   res.redirect("/urls");
+  }else{
+    res.redirect("/urls");
+  }
 });
 
 app.post("/register", (req, res)=>{
   let email = req.body.email;
   let password = req.body.password;
+  const hashedPassword = bcrypt.hashSync(password, 10);
+  console.log(email);
+  
+  // console.log(hashedPassword);
   if(email === "" || password === ""){
     return res.status(400).send("no user with that email found");
     // res.redirect("/register");
     
   }else if(getUserByEmail(email)){
     return res.status(400).send("that account already exists, please try again");
-
   }else{
 
     const user = {
@@ -131,19 +150,16 @@ app.post("/register", (req, res)=>{
 //////////////////////////////////////////////////////////////
 //displays all the URL and their shortened forms
 app.get("/urls", (req, res) => {
-  
-  if(req.cookies["user_id"] === undefined){
-    res.redirect("register");
-  }else{
-   
+if(!req.cookies["user_id"]){
+  res.send("You have not logged in yet! <a href='/login'>Login Here </a>")
+}else{
   const templateVars = {
     urls: urlDatabase,
     email: getUserNameByUserId([req.cookies["user_id"]]),
   };
     res.render("urls_index", templateVars);
 
-  }
-  // console.log(req.cookies["username"]);
+}
 });
 
 app.get("/login", (req, res) => {
@@ -169,37 +185,36 @@ app.get("/urls/new", (req, res) => {
   const templateVars = {
     email: getUserNameByUserId([req.cookies["user_id"]]),
   };
-  res.render("urls_new", templateVars);
+  if(getUserByEmail(templateVars.email)){
+    res.render("urls_new", templateVars);
+  }else{
+    res.redirect('/login');
+  }
 });
 
-app.get("/u/:shortURL", (req, res) => {
-  const shortURL = req.params.shortURL;
-  const longURL = urlDatabase[shortURL];
-  res.redirect(longURL);
+app.get('/u/:shortURL', (req, res) => {
+  if (urlDatabase[req.params.shortURL]) {
+    fullURL = urlDatabase[req.params.shortURL].longURL;
+    console.log(fullURL);
+    res.redirect(fullURL);
+  }
+  else {
+    res.sendStatus(404);
+  }
 });
 
 app.get("/urls/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
-  const longURL = urlDatabase[shortURL];
+  const longURL = urlDatabase[shortURL].longURL;
   const templateVars = {
-    shortURL,
-    longURL,
+    shortURL: shortURL,
+    longURL: longURL,
     email: getUserNameByUserId([req.cookies["user_id"]]),
   };
+  console.log(templateVars);
   res.render("urls_show", templateVars);
 });
 
-//displays a single URL and its shortned form
-app.get("/urls/:shortURL", (req, res) => {
-  const shortURL = req.params.shortURL;
-  const longURL = urlDatabase[shortURL];
-  const templateVars = {
-    shortURL,
-    longURL,
-    email: rgetUserNameByUserId([req.cookies["user_id"]]),
-  };
-  res.render("urls_show", templateVars);
-});
 
 //------------------------------------------------------------//
 
