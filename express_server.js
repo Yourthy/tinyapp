@@ -1,19 +1,18 @@
-//////////////////////////////////////////////////////////////
-//                      SETUP                               //
-//////////////////////////////////////////////////////////////
+
+//                        SETUP                               
 
 const express = require("express");
 const cookieSession = require("cookie-session");
 const bcrypt = require('bcrypt');
-const {getUserByEmail, generateRandomString, getEmailByUserID} = require("./helpers");
+const methodOverride = require("method-override");
+const {getUserByEmail, generateRandomString, getEmailByUserID, doesUrlBelongToUser} = require("./helpers");
 const app = express();
 const PORT = 8080;
 const bodyParser = require("body-parser");
 app.set("view engine", "ejs");
 
-//////////////////////////////////////////////////////////////
-//                    MIDDLEWARE                            //
-//////////////////////////////////////////////////////////////
+
+//                      MIDDLEWARE    
 
 app.use(bodyParser.urlencoded(
   { 
@@ -27,15 +26,16 @@ app.use(cookieSession(
   }
 ));
 
-//////////////////////////////////////////////////////////////
-//                       DATABASES                          //
-//////////////////////////////////////////////////////////////
 
+//                       DATABASES     
+
+//url database to store created/edited urls
 const urlDatabase = {
   "b2xVn2": {longURL: "http://www.lighthouselabs.ca",  userID: "aJ48lW"},
   "9sm5xK": {longURL: "http://www.google.com", userID: "aJ48lW"}
 };
 
+//user databse for cookies
 const users = {
   "123ABC": {
     id:"123ABC",
@@ -44,10 +44,10 @@ const users = {
   }
 };
 
-//////////////////////////////////////////////////////////////
-//                     POST REQUESTS                        //
-//////////////////////////////////////////////////////////////
 
+//                     POST REQUESTS                        
+
+//urls route that creates a new url database and redirects to urls/(shortURL created)
 app.post("/urls", (req, res) => {
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = {};
@@ -56,6 +56,7 @@ app.post("/urls", (req, res) => {
   res.redirect("/urls/" + shortURL);
 });
 
+//login route that checks if input is entered correctly/userID exists and redirects to urls page...
 app.post("/login", (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
@@ -77,11 +78,13 @@ app.post("/login", (req, res) => {
   }
 });
 
+//logout route to redirect to login page...
 app.post("/logout", (req, res) => {
   req.session = null; 
   res.redirect("/login");
 });
 
+//url delete route that removes url if you are the user...
 app.post("/urls/:shortURL/delete", (req, res) => {
   const shortURL = req.params.shortURL;
   if(urlDatabase[shortURL].userID === req.session["user_id"]){
@@ -92,6 +95,7 @@ app.post("/urls/:shortURL/delete", (req, res) => {
   }
 });
 
+//register page that hashes the password given and checks if account already exists. Updates user object...
 app.post("/register", (req, res)=>{
   const id = generateRandomString();
   const email = req.body.email;
@@ -113,10 +117,27 @@ app.post("/register", (req, res)=>{
   }
 });
 
-//////////////////////////////////////////////////////////////
-//                     GET REQUESTS                         //
-//////////////////////////////////////////////////////////////
+//edit url route that allows user to update an existing url if they had previously created it...
+app.post("/urls/:id", (req, res)=>{
+  const userID = req.session.user_id;
+  const shortURL = req.params.id;
+  const longURL = req.body.longURL;
+  if(doesUrlBelongToUser(userID, urlDatabase, shortURL)){
+    urlDatabase[shortURL] = {
+      longURL,
+      userID,
+    };
+    res.redirect("/urls");
 
+  }else{
+    return res.status(403).send("cannot edit urls you do not own!");
+  }
+});
+
+
+//                     GET REQUESTS                         
+
+//urls render page that allows users to see/edit/delete urls they've created
 app.get("/urls", (req, res) => {
   const user = req.session['user_id'];
   const userDB = {};
@@ -129,13 +150,15 @@ app.get("/urls", (req, res) => {
       }
     }
     const templateVars = {
+      urlDatabase: urlDatabase,
       urls: userDB,
       email: getEmailByUserID(req.session["user_id"], users),
     };
-      res.render("urls_index", templateVars);
-    }
+    res.render("urls_index", templateVars);
+  }
 });
 
+//login render page...
 app.get("/login", (req, res) => {
   const templateVars = {
     email: getEmailByUserID(req.session["user_id"], users)
@@ -143,7 +166,7 @@ app.get("/login", (req, res) => {
   res.render('login', templateVars);
 });
 
-
+//register render page 
 app.get("/register", (req, res) => {
   const templateVars = {
     email: getEmailByUserID(req.session["user_id"], users),
@@ -151,6 +174,7 @@ app.get("/register", (req, res) => {
   res.render("register", templateVars);
 });
 
+//new urls render page that restricts users from seeing page if not logged in...
 app.get("/urls/new", (req, res) => {
   const templateVars = {
     email: getEmailByUserID(req.session["user_id"], users),
@@ -162,37 +186,32 @@ app.get("/urls/new", (req, res) => {
   }
 });
 
+//created url page render that limits users from seeing urls they did not create...
+app.get("/urls/:shortURL", (req, res) => {
+  const shortURL = req.params.shortURL;
+  const longURL = urlDatabase[shortURL].longURL;
+  const userID = req.session["user_id"];
+  if(!userID){
+    res.redirect("/login");
+  }else{
+    const templateVars = {
+      shortURL: shortURL,
+      longURL: longURL,
+      email: getEmailByUserID(req.session["user_id"], users),
+    };
+    res.render("urls_show", templateVars);
+  }
+});
+
+//allows user to redirect to url using short or long url they created...
 app.get("/u/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
   const longURL = urlDatabase[shortURL].longURL;
   res.redirect(longURL);
 });
 
-app.get("/urls/:shortURL", (req, res) => {
-  const shortURL = req.params.shortURL;
-  const longURL = urlDatabase[shortURL].longURL;
-  const templateVars = {
-    shortURL: shortURL,
-    longURL: longURL,
-    email: getEmailByUserID(req.session["user_id"], users),
-  };
-  res.render("urls_show", templateVars);
-});
+//                     TERMINAL LOG                         
 
-app.get("/urls/:shortURL", (req, res) => {
-  const shortURL = req.params.shortURL;
-  const longURL = urlDatabase[shortURL];
-  const templateVars = {
-    shortURL,
-    longURL,
-    email: getEmailByUserID(req.session["user_id"], users),
-  };
-  res.render("urls_show", templateVars);
-});
-
-//////////////////////////////////////////////////////////////
-//                     TERMINAL LOG                         //
-//////////////////////////////////////////////////////////////
 
 app.listen(PORT, () => {
   console.log(`Now listening on port:${PORT}`);

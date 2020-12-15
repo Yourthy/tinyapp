@@ -27,9 +27,11 @@
             <td><%= url %></td>
             <td><%= urls[url].longURL %></td>
             <td><%= urls[url].userID %></td>
-            <td><a href = "/urls/<%=url%>"
-              <button type="submit" class="btn btn-outline-danger" style="color:blue; border-color:blue;">Edit</button>
-            </a></td>
+            <td>
+                <a href = "/urls/<%=url%>"
+                  <button type="submit" class="btn btn-outline-danger" style="color:blue; border-color:blue;">Edit</button>
+                </a>
+            </td>
             <td>
               <form method="POST" action="/urls/<%=url%>/delete">
                 <button type="submit" class="btn btn-outline-danger">Delete</button>
